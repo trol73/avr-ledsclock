@@ -1,0 +1,8 @@
+syntax: regexp
+
+syntax: glob
+*.class
+*.o
+*.elf
+.DS_Store
+utils/wavconverter/bin/*

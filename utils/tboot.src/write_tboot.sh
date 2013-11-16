@@ -1,0 +1,1 @@
+avrdude	-pm32 -cusbasp -u -U flash:w:tboot.hex:i

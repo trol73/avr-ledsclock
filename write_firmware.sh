@@ -1,0 +1,1 @@
+./tboot -U flash:w:src/main.hex
