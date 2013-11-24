@@ -1,1 +1,1 @@
-./tboot -U flash:w:src/main.hex
+./tboot -U flash:w:firmware/src/main.hex

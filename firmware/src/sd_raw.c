@@ -188,7 +188,7 @@ uint8_t sd_raw_init()
 
     unselect_card();
 MSG("INIT-1");
-    /* initialize SPI with lowest frequency; max. 400kHz during identification mode of card */
+    // initialize SPI with lowest frequency; max. 400kHz during identification mode of card
     SPCR = (0 << SPIE) | /* SPI Interrupt Enable */
            (1 << SPE)  | /* SPI Enable */
            (0 << DORD) | /* Data Order: MSB first */
@@ -197,7 +197,7 @@ MSG("INIT-1");
            (0 << CPHA) | /* Clock Phase: sample on rising SCK edge */
            (1 << SPR1) | /* Clock Frequency: f_OSC / 128 */
            (1 << SPR0);
-    SPSR &= ~(1 << SPI2X); /* No doubled clock frequency */
+    SPSR &= ~(1 << SPI2X); // No doubled clock frequency
 
     // initialization procedure
     sd_raw_card_type = 0;
@@ -208,12 +208,15 @@ MSG("INIT-1");
 //    }
 MSG("INIT-2");	// sometimes if freeze here !!!
     // card needs 74 cycles minimum to start up
-    for(uint8_t i = 0; i < 10; ++i)
-    {
+    for (uint8_t i = 0; i < 10; ++i) {
         // wait 8 clock cycles
-        sd_raw_rec_byte();
+        //sd_raw_rec_byte();
+        if ( !sd_raw_rec_wait_byte(200) ) {
+            MSG("INIT-2-error");
+            return 0;
+        }
     }
-
+MSG("INIT-21");  
     // address card
     select_card();
 
@@ -231,6 +234,7 @@ MSG("INIT-2");	// sometimes if freeze here !!!
             return 0;
         }
     }
+MSG("INIT-3");  
 #if SD_RAW_SDHC
     /* check for version of SD card specification */
     response = sd_raw_send_command(CMD_SEND_IF_COND, 0x100 /* 2.7V - 3.6V */ | 0xaa /* test pattern */);
@@ -262,6 +266,7 @@ MSG("INIT-2");	// sometimes if freeze here !!!
             /* MMC card */
         }
     }
+MSG("INIT-4");      
     // wait for card to get ready
     for(uint16_t i = 0; ; ++i)
     {
@@ -307,6 +312,7 @@ MSG("INIT-2");	// sometimes if freeze here !!!
         sd_raw_rec_byte();
     }
 #endif
+MSG("INIT-5");  
     // set block size to 512 bytes
     if(sd_raw_send_command(CMD_SET_BLOCKLEN, 512)) {
         unselect_card();
@@ -380,12 +386,27 @@ void sd_raw_send_byte(uint8_t b)
  */
 uint8_t sd_raw_rec_byte()
 {
-    /* send dummy data for receiving some */
+    // send dummy data for receiving some
     SPDR = 0xff;
     while(!(SPSR & (1 << SPIF)));
     SPSR &= ~(1 << SPIF);
 
     return SPDR;
+}
+
+// ADDDED BY TROL, DOCUMENT IT !!!!!!
+uint8_t sd_raw_rec_wait_byte(uint8_t timeout) {
+    // send dummy data for receiving some
+    SPDR = 0xff;
+    while ( !(SPSR & (1 << SPIF)) ) {
+        timeout--;
+        if (timeout == 0) {
+            return 0;
+        }
+    }
+    SPSR &= ~(1 << SPIF);
+
+    return 1;
 }
 
 /**

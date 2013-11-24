@@ -211,7 +211,7 @@ static inline void cmdDiskInfo() {
     uart_puts_p(PSTR("Size: ")); uart_putdw_dec(fsSize); uart_putc('\n');
     uart_puts_p(PSTR("Free: ")); uart_putdw_dec(fsFree); uart_putc('\n');
 
-	sdrdr_close();
+	//sdrdr_close();
 }
 
 static inline bool cmdSetBrightness(char *str) {
@@ -232,25 +232,33 @@ static inline void cmdDiskCd(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	if ( fat_get_dir_entry_of_path(sdcard_fs, path, &sdcard_directory) ) {
+	struct fat_dir_entry_struct dir_entry;
+	if ( fat_get_dir_entry_of_path(sdcard_fs, path, &dir_entry) ) {
 		strcpy(sdcard_currentDirectory, path);
 		uart_puts_p(PSTR("OK\n")); 
 	} else {
-		uart_puts_p(PSTR("directory not found\n")); 
+		uart_puts_p(PSTR("directory not found\n"));
 	}
-	sdrdr_close();
+	//sdrdr_close();
 }
 
+
+static bool openDirectory() {
+	MSG("fat_open_dir"); 	MSG_STR(sdcard_currentDirectory);
+	sdcard_dd = fat_open_dir(sdcard_fs, &sdcard_directory);
+	if ( !sdcard_dd ) {
+		uart_puts_p(PSTR("can't open dir\n")); 
+		return false;
+	}
+	return true;
+}
 
 static inline void cmdDiskLs() {
 	if (!diskInit()) {
 		return;
 	}
-	MSG("fat_open_dir");
-	sdcard_dd = fat_open_dir(sdcard_fs, &sdcard_directory);
-	if ( !sdcard_dd ) {
-		uart_puts_p(PSTR("can't open dir\n")); 
-		return false;
+	if (!openDirectory()) {
+		return;
 	}
 
 	// print directory listing
@@ -267,56 +275,70 @@ static inline void cmdDiskLs() {
 		uart_putc('\n');
 	}
 	fat_close_dir(sdcard_dd);
-	sdrdr_close();
+	sdcard_dd = 0;
+	//sdrdr_close();
 }
 
 static inline void cmdDiskFread(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	sdrdr_close();
+	//sdrdr_close();
 }
 
 static inline void cmdDiskFwrite(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	sdrdr_close();
+	//sdrdr_close();
 }
 
 static inline void cmdDiskMkdir(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	sdrdr_close();
+	if (!openDirectory()) {
+		return;
+	}
+uart_puts(path);	
+	struct fat_dir_entry_struct dir_entry;
+	if ( fat_create_dir(sdcard_dd, path, &dir_entry) ) {
+		uart_puts_p(PSTR("OK\n")); 
+	} else {
+		uart_puts_p(PSTR("can't create dir\n")); 
+	}
+	fat_close_dir(sdcard_dd);
+	sdcard_dd = 0;
+
+	//sdrdr_close();
 }
 
 static inline void cmdDiskRm(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	sdrdr_close();
+	//sdrdr_close();
 }
 
 static inline void cmdDiskPrintFtime(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	sdrdr_close();
+	//sdrdr_close();
 }
 
 static inline void cmdDiskPrintFsize(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	sdrdr_close();
+	//sdrdr_close();
 }
 
 static inline void cmdDiskPlayFile(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	sdrdr_close();
+	//sdrdr_close();
 }
 
 static inline void cmdHelp() {
@@ -330,10 +352,11 @@ static inline void onCommand(char *str) {
 	uint8_t cmd = getCommandCode(str, &strArgs);
 
 
-	MSG_DEC("=?===> ", cmd);
+//	MSG_DEC("=?===> ", cmd);
 
 	switch ( cmd ) {
 		case CMD_UPDATE:
+			sdrdr_close();
 			cli();
 			jumpPtr(0x7E00);
 			return;

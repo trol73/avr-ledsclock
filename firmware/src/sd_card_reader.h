@@ -55,7 +55,7 @@ static struct fat_file_struct* open_file_in_dir(struct fat_fs_struct* fs, struct
 /**
  * Inits SD-card device, opens partition and file system
  */
-static inline bool sdrdr_init() {
+static bool sdrdr_init() {
 	// setup sd card slot
 	MSG("sdcard_raw_init");
 	sdcard_raw_inited = sd_raw_init();
@@ -100,10 +100,19 @@ static inline bool sdrdr_init() {
 	sdcard_currentDirectory[0] = '/';
 	sdcard_currentDirectory[1] = 0;
 	if (!fat_get_dir_entry_of_path(sdcard_fs, sdcard_currentDirectory, &sdcard_directory) ) {
-		sdcard_currentDirectory[0] = '/';
-		sdcard_currentDirectory[1] = 0;
-		fat_get_dir_entry_of_path(sdcard_fs, sdcard_currentDirectory, &sdcard_directory);
+		//sdcard_currentDirectory[0] = '/';
+		//sdcard_currentDirectory[1] = 0;
+		//fat_get_dir_entry_of_path(sdcard_fs, sdcard_currentDirectory, &sdcard_directory);
+
+		// TODO !!!
 	}
+
+
+
+
+
+
+
 
 /*
 	MSG("fat_open_dir");
@@ -156,6 +165,27 @@ static inline bool sdrdr_init() {
 	return true;
 }
 
+
+static inline void sdrdr_close() {
+	if ( !sdcard_raw_inited ) {
+		return;
+	}
+	if ( sdcard_dd ) {
+		fat_close_dir(sdcard_dd);
+		sdcard_dd = 0;
+	}
+	if ( sdcard_fs ) {
+		fat_close(sdcard_fs);
+		sdcard_fs = 0;
+	}
+	if ( sdcard_partition ) {
+		partition_close(sdcard_partition);
+		sdcard_partition = 0;
+	}
+	sdcard_raw_inited = false;
+}
+
+
 static bool sdrdr_openFile() {
 	sdcard_fd = open_file_in_dir(sdcard_fs, sdcard_dd, "kino.snd");
 	if ( !sdcard_fd ) {
@@ -185,27 +215,6 @@ static void sdrdr_closeFile() {
 	}
 	task_readNextBlock = false;
 	bt_Reset(false);
-}
-
-
-
-
-static inline void sdrdr_close() {
-	if ( !sdcard_raw_inited ) {
-		return;
-	}
-	if ( sdcard_dd ) {
-		fat_close_dir(sdcard_dd);
-		sdcard_dd = 0;
-	}
-	if ( sdcard_fs ) {
-		fat_close(sdcard_fs);
-		sdcard_fs = 0;
-	}
-	if ( sdcard_partition ) {
-		partition_close(sdcard_partition);
-		sdcard_partition = 0;
-	}
 }
 
 

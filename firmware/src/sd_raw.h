@@ -141,6 +141,9 @@ uint8_t sd_raw_get_info(struct sd_raw_info* info);
 uint8_t sd_raw_rec_byte();
 uint8_t sd_raw_send_command(uint8_t command, uint32_t arg);
 
+
+// !!! DESCRIBE IT
+uint8_t sd_raw_rec_wait_byte(uint8_t timeout);
 /**
  * @}
  */

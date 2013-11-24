@@ -47,11 +47,6 @@ bool pcf8583_getTime(uint8_t *hour, uint8_t *min, uint8_t *sec, uint8_t *hsec) {
 	*min = bcd2int(b3);
 	*hour = bcd2int(b4);
 
-	MSG_DEC("HSEC = ", *hsec);
-	MSG_DEC("SEC = ", *sec);
-	MSG_DEC("MIN = ", *min);
-	MSG_DEC("HOUR = ", *hour);
-
 	return true;
 }
 
