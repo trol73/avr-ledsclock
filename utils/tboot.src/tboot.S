@@ -7,25 +7,52 @@
 
 #include <avr/io.h>
 
-
 #define GLUE(a, b)     a##b
 #define PORT(x)        GLUE(PORT, x)
 #define PIN(x)         GLUE(PIN, x)
 #define DDR(x)         GLUE(DDR, x)
 
 
-#define FULL_ECHO_MODE		1
+;; ###############################
+;; ####  Bootloader settings  ####
+;; ###############################
 
 
-;FOSC = 1000000			; factory-default internal osc setting
-;FOSC = 8000000			; (8MHz internal osc)
-FOSC = 11059200			; 
+; Enable echo mode
+#define FULL_ECHO_MODE              0
+#define BINARY_MODE                 1
+#define FAST_MODE_READ              1
+#define FAST_MODE_WRITE             0
+#define SUPPORT_EEPROM              0
 
-;BAUDRATE = 115200		; set this to whatever you want
-BAUDRATE = 230400			; set this to whatever you want
 
 
 
+//#define CONTROL_PORT            C
+//#define CONTROL_PIN             5
+
+#define INIT_SET_PORT            D
+#define INIT_SET_PIN             2
+
+
+#if BINARY_MODE
+	#define     put_xbyte  put_ch
+	#define     get_xbyte  get_ch
+#endif
+
+
+
+;FOSC = 1000000             ; factory-default internal osc setting
+;FOSC = 8000000             ; 8MHz internal osc
+FOSC = 11059200             ; 11.0592 external oscillator
+
+;BAUDRATE = 115200          ; set this to whatever you want
+BAUDRATE = 230400           ; set this to whatever you want
+
+
+;; #########################################
+;; ####  Bootloader settings block end  ####
+;; #########################################
 
 
 UBR = (FOSC / 16 / BAUDRATE) - 1
@@ -33,22 +60,40 @@ UBR = (FOSC / 16 / BAUDRATE) - 1
 .section .init0
 	
 .global normal_start
-normal_start:
-	; exit from the bootloader and run main firmware
+normal_start:	
 		
 .section .boot
 bootloader_start:
-	; enable bluetooth
-	ldi		R16, 4
-	out		DDRD, r16
-	out		PORTD, r16
+
+
+#ifdef CONTROL_PORT
+;; Check CONTROL_PORT, jump to normal bootup if low
+	cbi		DDR(CONTROL_PORT), CONTROL_PIN			; configure pin to input
+	sbi		PORT(CONTROL_PORT), CONTROL_PIN			; enable pull-up
+
+	;; Wait for 256 cycles
+	clr		r1
+start_wait_loop:
+	dec		r1
+	brne		start_wait_loop
+
+	;; Check jumper
+	sbic		PIN(CONTROL_PORT), CONTROL_PIN			; if zerro, the next jump will be skipped
+	rjmp		normal_start									; if the pin is set, it is normal start
+#endif
+
+#ifdef INIT_SET_PORT
+	; set up pin on startup
+	sbi		DDR(INIT_SET_PORT), INIT_SET_PIN
+	sbi		PORT(INIT_SET_PORT), INIT_SET_PIN
+#endif
+
 	
 	;; Set up the UART
 	ldi		R24, lo8(UBR)
 	out		UBRRL, R24
 	ldi		R24, hi8(UBR)
 	out		UBRRH, R24
-
 
 	ldi		R24, (1<<RXEN) | (1<<TXEN)
 	out		UCSRB, R24
@@ -74,7 +119,7 @@ reset_stack_and_putch:
 	rcall 	put_ch
 	
 put_ok_and_continue:
-	ldi 		r16, 13			; the symbol of the loader response, is sent after each executed command
+	ldi 		r16, 13			; the symbol of t'he loader response, is sent after each executed command
 
 	;; wait for completion before sending ack byte
 putch_and_continue:
@@ -99,6 +144,23 @@ command_loop:
 	rjmp		put_ok_and_continue
 not_ldz:
 	
+	
+#if FAST_MODE_READ
+;; 'R' command (fast)
+	cpi 		r16, 'R'						; read program memory
+	brne		not_fast_read
+	rcall		get_xbyte					; loading bytes count (hi)
+	mov		r25, r16
+	rcall		get_xbyte					; loading bytes count (lo)
+	mov		r24, r16
+read_cycle:
+	lpm		r16, Z+						; reading memory
+	rcall		put_xbyte
+	sbiw		r24, 1
+	brne		read_cycle
+	rjmp		put_ok_and_continue	
+not_fast_read:
+#else
 ;; 'R' command
 	cpi 		r16, 'R'						; read program memory
 	brne		not_lpm
@@ -110,7 +172,10 @@ not_ldz:
 	brne		2b
 	rjmp		put_ok_and_continue
 not_lpm:
+#endif
 
+#if FAST_MODE_WRITE
+#else
 ;; 'W' command
 	cpi		r16, 'W'						; write program memory
 	brne		not_wpm
@@ -119,13 +184,14 @@ not_lpm:
 	ldi		r18, (1<<SPMEN)
 2:	rcall		get_r0r1
 	out		SPMCR, r18
-	spm
-	adiw		ZL, 2
+	spm										; [R1:R0] -> RAM[Z]
+	adiw		ZL, 2							; Z += 2
 	subi		r17, 1						; words counter decrement
-	brne		2b
+	brne		2b								; jump to label '2' if [R17] != 0
 	rjmp		put_ok_and_continue
-not_wpm:
+#endif
 
+not_wpm:
 ;; 'P' command
 	cpi		r16, 'P'						; load SPM control register
 	brne		not_spmcr
@@ -147,19 +213,22 @@ not_spmcr:
 	rcall		put_xbyte
 	ldi		r16, lo8(bootloader_start)	;; loader offset low
 	rcall		put_xbyte
+	ldi		r16, (SUPPORT_EEPROM << 0) | (FULL_ECHO_MODE << 1) | (BINARY_MODE << 2) | (FAST_MODE_READ << 3) | (FAST_MODE_WRITE << 4)
+	rcall		put_xbyte						;; flags
 	rjmp		put_ok_and_continue
 not_query_parms:
 
 ;; '@' command
-	cpi		r16, '@'						; jump to address from [ZH:ZL]
+	cpi		r16, '@'						; jump to arbitrary address
 	brne		not_icall
 	ijmp
 not_icall:
-	
+
+
 	;; no more command letters
 	;; fall through to error case
 
-	
+
 err:
 	ldi		r16, '!'
 	set
@@ -185,9 +254,10 @@ get_ch:
 	in			r16, UDR				; else, retrieve data byte
 #if FULL_ECHO_MODE
 	rcall		put_ch
-#endif
+#endif	
 	ret
 
+#if !BINARY_MODE
 ;; Gets a nybble from UART to [R16]
 get_xdigit:
 	rcall		get_ch				; retrieve a character in r16
@@ -214,6 +284,7 @@ get_xbyte:
 	or			r16, r15
 	ret
 
+
 ;; Sendns a hex byte [R16] to UART
 put_xbyte:
 	mov		r15, r16
@@ -227,6 +298,7 @@ put_xdigit:
 	brlt		1f
 	subi		r16, (- ('a' - '0' - 10)) ; 
 1:	subi		r16, (- (10 + '0'))
+#endif
 
 ;; Sends a byte [R16] to UART
 put_ch:

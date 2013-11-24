@@ -6,7 +6,7 @@ OUTPUT_FORMAT("elf32-avr","elf32-avr","elf32-avr")
 OUTPUT_ARCH(avr:4)
 MEMORY
 {
-  text   (rx)   : ORIGIN = 0, LENGTH = 8K
+  text   (rx)   : ORIGIN = 0, LENGTH = 32K
   data   (rw!x) : ORIGIN = 0x800060, LENGTH = 0xffa0
   eeprom (rw!x) : ORIGIN = 0x810000, LENGTH = 64K
 }
