@@ -357,9 +357,9 @@ uint8_t sd_raw_available()
  *
  * \returns 1 if the card is locked, 0 if it is not.
  */
-uint8_t sd_raw_locked()
-{
-    return get_pin_locked() == 0x00;
+uint8_t sd_raw_locked() {
+	return 0;
+    //return get_pin_locked() == 0x00;
 }
 
 /**
@@ -369,10 +369,9 @@ uint8_t sd_raw_locked()
  * \param[in] b The byte to sent.
  * \see sd_raw_rec_byte
  */
-void sd_raw_send_byte(uint8_t b)
-{
+void sd_raw_send_byte(uint8_t b) {
     SPDR = b;
-    /* wait for byte to be shifted out */
+    // wait for byte to be shifted out
     while(!(SPSR & (1 << SPIF)));
     SPSR &= ~(1 << SPIF);
 }
@@ -688,10 +687,10 @@ uint8_t sd_raw_read_interval(offset_t offset, uint8_t* buffer, uintptr_t interva
  * \returns 0 on failure, 1 on success.
  * \see sd_raw_write_interval, sd_raw_read, sd_raw_read_interval
  */
-uint8_t sd_raw_write(offset_t offset, const uint8_t* buffer, uintptr_t length)
-{
-    if(sd_raw_locked())
+uint8_t sd_raw_write(offset_t offset, const uint8_t* buffer, uintptr_t length) {
+    if (sd_raw_locked()) {
         return 0;
+    }
 
     offset_t block_address;
     uint16_t block_offset;

@@ -72,7 +72,7 @@ struct fat_dir_struct;
 struct fat_dir_entry_struct
 {
     /** The file's name, truncated to 31 characters. */
-    char long_name[32];
+    char long_name[FAT_MAX_FILE_LENGTH];
     /** The file's attributes. Mask of the FAT_ATTRIB_* constants. */
     uint8_t attributes;
 #if FAT_DATETIME_SUPPORT

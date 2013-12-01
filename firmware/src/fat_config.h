@@ -108,7 +108,12 @@ void get_datetime(uint16_t* year, uint8_t* month, uint8_t* day, uint8_t* hour, u
  * \ingroup fat_config
  * Maximum number of directory handles.
  */
-#define FAT_DIR_COUNT 2
+#define FAT_DIR_COUNT 3
+
+/**
+ *
+ */
+#define FAT_MAX_FILE_LENGTH 16
 
 /**
  * @}

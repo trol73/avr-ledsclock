@@ -232,14 +232,17 @@ static inline void cmdDiskCd(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	struct fat_dir_entry_struct dir_entry;
-	if ( fat_get_dir_entry_of_path(sdcard_fs, path, &dir_entry) ) {
-		strcpy(sdcard_currentDirectory, path);
-		uart_puts_p(PSTR("OK\n")); 
-	} else {
-		uart_puts_p(PSTR("directory not found\n"));
+
+	struct fat_dir_entry_struct subdir_entry;
+	if (find_file_in_dir(sdcard_fs, sdcard_dd, path, &subdir_entry)) {
+		struct fat_dir_struct* dd_new = fat_open_dir(sdcard_fs, &subdir_entry);
+		if (dd_new) {
+			uart_puts_p(PSTR("OK\n"));
+			return;
+		}
 	}
-	//sdrdr_close();
+
+	uart_puts_p(PSTR("directory not found\n"));
 }
 
 
@@ -247,7 +250,7 @@ static bool openDirectory() {
 	MSG("fat_open_dir"); 	MSG_STR(sdcard_currentDirectory);
 	sdcard_dd = fat_open_dir(sdcard_fs, &sdcard_directory);
 	if ( !sdcard_dd ) {
-		uart_puts_p(PSTR("can't open dir\n")); 
+		uart_puts_p(PSTR("can't open dir\n"));
 		return false;
 	}
 	return true;
@@ -300,7 +303,7 @@ static inline void cmdDiskMkdir(char *path) {
 	if (!openDirectory()) {
 		return;
 	}
-uart_puts(path);	
+
 	struct fat_dir_entry_struct dir_entry;
 	if ( fat_create_dir(sdcard_dd, path, &dir_entry) ) {
 		uart_puts_p(PSTR("OK\n")); 
@@ -309,15 +312,27 @@ uart_puts(path);
 	}
 	fat_close_dir(sdcard_dd);
 	sdcard_dd = 0;
-
-	//sdrdr_close();
 }
+
 
 static inline void cmdDiskRm(char *path) {
 	if (!diskInit()) {
 		return;
 	}
-	//sdrdr_close();
+	if (!openDirectory()) {
+		return;
+	}
+	struct fat_dir_entry_struct dir_entry;
+
+	if ( find_file_in_dir(sdcard_fs, sdcard_dd, path, &dir_entry) ) {
+		if ( fat_delete_file(sdcard_fs, &dir_entry) ) {
+			uart_puts_p(PSTR("OK\n"));
+			return;
+		}
+	}
+
+	fat_close_dir(sdcard_dd);
+	sdcard_dd = 0;
 }
 
 static inline void cmdDiskPrintFtime(char *path) {
@@ -430,6 +445,7 @@ static inline void onCommand(char *str) {
 			break;
 
 		case CMD_HELP:
+sdrdr_close();
 			cmdHelp();
 			break;
 
@@ -467,6 +483,7 @@ static inline void onCommand(char *str) {
 
 		default:
 			uart_puts_p(PSTR("invalid command"));
+			uart_puts(str);
 			break;
 	}
 

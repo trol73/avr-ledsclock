@@ -493,10 +493,8 @@ cluster_t fat_get_next_cluster(const struct fat_fs_struct* fs, cluster_t cluster
  * \param[in] count The number of clusters to allocate.
  * \returns 0 on failure, the number of the first new cluster on success.
  */
-cluster_t fat_append_clusters(struct fat_fs_struct* fs, cluster_t cluster_num, cluster_t count)
-{
-    if(!fs) {
-MSG("CLUSTER _ZERRO");
+cluster_t fat_append_clusters(struct fat_fs_struct* fs, cluster_t cluster_num, cluster_t count) {
+    if ( !fs ) {
         return 0;
     }
 
@@ -512,23 +510,22 @@ MSG("CLUSTER _ZERRO");
     uint32_t fat_entry32;
     uint8_t is_fat32 = (fs->partition->type == PARTITION_TYPE_FAT32);
 
-    if(is_fat32)
+    if (is_fat32)
         cluster_count = fs->header.fat_size / sizeof(fat_entry32);
     else
 #endif
         cluster_count = fs->header.fat_size / sizeof(fat_entry16);
 
     fs->cluster_free = 0;
-    for(cluster_t cluster_left = cluster_count; cluster_left > 0; --cluster_left, ++cluster_current)
-    {
-        if(cluster_current < 2 || cluster_current >= cluster_count)
+    for (cluster_t cluster_left = cluster_count; cluster_left > 0; --cluster_left, ++cluster_current) {
+MSG_DEC("CL# ", cluster_left);
+        if (cluster_current < 2 || cluster_current >= cluster_count)
             cluster_current = 2;
 
 #if FAT_FAT32_SUPPORT
         if(is_fat32)
         {
             if(!device_read(fat_offset + (offset_t) cluster_current * sizeof(fat_entry32), (uint8_t*) &fat_entry32, sizeof(fat_entry32))) {
-MSG("CLUSTER CANT READ-1");
                 return 0;
             }
         }
@@ -536,14 +533,12 @@ MSG("CLUSTER CANT READ-1");
 #endif
         {
             if(!device_read(fat_offset + (offset_t) cluster_current * sizeof(fat_entry16), (uint8_t*) &fat_entry16, sizeof(fat_entry16))) {
-MSG("CLUSTER CANT READ-2");
                 return 0;
             }
         }
 
 #if FAT_FAT32_SUPPORT
-        if(is_fat32)
-        {
+        if(is_fat32) {
             /* check if this is a free cluster */
             if(fat_entry32 != HTOL32(FAT32_CLUSTER_FREE))
                 continue;
@@ -570,37 +565,36 @@ MSG("CLUSTER CANT READ-2");
         else
 #endif
         {
-            /* check if this is a free cluster */
-            if(fat_entry16 != HTOL16(FAT16_CLUSTER_FREE))
+            // check if this is a free cluster
+            if (fat_entry16 != HTOL16(FAT16_CLUSTER_FREE))
                 continue;
 
             /* If we don't need this free cluster for the
              * current allocation, we keep it in mind for
              * the next time.
              */
-            if(count_left == 0)
-            {
+            if (count_left == 0) {
                 fs->cluster_free = cluster_current;
                 break;
             }
 
-            /* allocate cluster */
-            if(cluster_next == 0)
+            // allocate cluster
+            if (cluster_next == 0)
                 fat_entry16 = HTOL16(FAT16_CLUSTER_LAST_MAX);
             else
                 fat_entry16 = htol16((uint16_t) cluster_next);
 
-            if(!device_write(fat_offset + (offset_t) cluster_current * sizeof(fat_entry16), (uint8_t*) &fat_entry16, sizeof(fat_entry16)))
+            if ( !device_write(fat_offset + (offset_t) cluster_current * sizeof(fat_entry16), (uint8_t*) &fat_entry16, sizeof(fat_entry16)) ) {
                 break;
+            }
         }
 
         cluster_next = cluster_current;
         --count_left;
-    }
+    } // for
 
-    do
-    {
-        if(count_left > 0)
+    do {
+        if (count_left > 0)
             break;
 
         /* We allocated a new cluster chain. Now join
@@ -634,7 +628,6 @@ MSG("CLUSTER CANT READ-2");
      * Free up all clusters already allocated.
      */
     fat_free_clusters(fs, cluster_next);
-MSG("CLUSTER END");
     return 0;
 }
 #endif
@@ -2247,20 +2240,15 @@ uint8_t fat_move_file(struct fat_fs_struct* fs, struct fat_dir_entry_struct* dir
  * \returns 0 on failure, 1 on success.
  * \see fat_delete_dir
  */
-uint8_t fat_create_dir(struct fat_dir_struct* parent, const char* dir, struct fat_dir_entry_struct* dir_entry)
-{
+uint8_t fat_create_dir(struct fat_dir_struct* parent, const char* dir, struct fat_dir_entry_struct* dir_entry) {
     if(!parent || !dir || !dir[0] || !dir_entry) {
-MSG("ZERRO PARAM");
         return 0;
     }
 
-    /* check if the file or directory already exists */
-    while(fat_read_dir(parent, dir_entry))
-    {
-        if(strcmp(dir, dir_entry->long_name) == 0)
-        {
+    // check if the file or directory already exists
+    while (fat_read_dir(parent, dir_entry)) {
+        if (strcmp(dir, dir_entry->long_name) == 0) {
             fat_reset_dir(parent);
-MSG("ALREADY EXIST");
             return 0;
         }
     }
@@ -2269,12 +2257,11 @@ MSG("ALREADY EXIST");
 
     // allocate cluster which will hold directory entries
     cluster_t dir_cluster = fat_append_clusters(fs, 0, 1);
-    if(!dir_cluster) {
-MSG("CLUSTER");
+    if (!dir_cluster) {
         return 0;
     }
 
-    /* clear cluster to prevent bogus directory entries */
+    // clear cluster to prevent bogus directory entries
     fat_clear_cluster(fs, dir_cluster);
     
     memset(dir_entry, 0, sizeof(*dir_entry));
@@ -2285,10 +2272,8 @@ MSG("CLUSTER");
                               (offset_t) (dir_cluster - 2) * fs->header.cluster_size;
     dir_entry->long_name[0] = '.';
     dir_entry->cluster = dir_cluster;
-    if(!fat_write_dir_entry(fs, dir_entry))
-    {
+    if (!fat_write_dir_entry(fs, dir_entry)) {
         fat_free_clusters(fs, dir_cluster);
-MSG("NO SPACE");
         return 0;
     }
 
@@ -2296,10 +2281,8 @@ MSG("NO SPACE");
     dir_entry->entry_offset += 32;
     dir_entry->long_name[1] = '.';
     dir_entry->cluster = parent->dir_entry.cluster;
-    if(!fat_write_dir_entry(fs, dir_entry))
-    {
+    if (!fat_write_dir_entry(fs, dir_entry)) {
         fat_free_clusters(fs, dir_cluster);
-MSG("NO SPACE-2");
         return 0;
     }
 
@@ -2308,18 +2291,14 @@ MSG("NO SPACE-2");
     dir_entry->cluster = dir_cluster;
 
     /* find place where to store directory entry */
-    if(!(dir_entry->entry_offset = fat_find_offset_for_dir_entry(fs, parent, dir_entry)))
-    {
+    if (!(dir_entry->entry_offset = fat_find_offset_for_dir_entry(fs, parent, dir_entry))) {
         fat_free_clusters(fs, dir_cluster);
-MSG("NO SPACE-3");        
         return 0;
     }
 
-    /* write directory to disk */
-    if(!fat_write_dir_entry(fs, dir_entry))
-    {
+    // write directory to disk
+    if (!fat_write_dir_entry(fs, dir_entry)) {
         fat_free_clusters(fs, dir_cluster);
-MSG("NO SPACE-4");
         return 0;
     }
 
